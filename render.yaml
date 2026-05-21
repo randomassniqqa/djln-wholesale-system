@@ -1,0 +1,60 @@
+services:
+  - type: web
+    name: taskflow-web
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /healthz
+    envVars:
+      - key: APP_NAME
+        value: TaskFlow
+      - key: APP_URL
+        value: https://it9al.onrender.com
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+      - key: APP_KEY
+        sync: false
+      - key: DB_CONNECTION
+        value: pgsql
+      - key: DB_URL
+        fromDatabase:
+          name: taskflow-postgres
+          property: connectionString
+      - key: DATABASE_URL
+        fromDatabase:
+          name: taskflow-postgres
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: taskflow-redis
+          type: keyvalue
+          property: connectionString
+      - key: REDIS_CLIENT
+        value: phpredis
+      - key: CACHE_STORE
+        value: redis
+      - key: SESSION_DRIVER
+        value: redis
+      - key: QUEUE_CONNECTION
+        value: redis
+      - key: LOG_CHANNEL
+        value: stderr
+      - key: FILESYSTEM_DISK
+        value: local
+      - key: VITE_APP_NAME
+        value: TaskFlow
+
+  - type: keyvalue
+    name: taskflow-redis
+    plan: starter
+    maxmemoryPolicy: allkeys-lru
+    ipAllowList: []
+
+databases:
+  - name: taskflow-postgres
+    databaseName: taskflow
+    user: taskflow
+    version: "15"
+    plan: starter

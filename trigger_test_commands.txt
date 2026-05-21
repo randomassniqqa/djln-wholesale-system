@@ -1,0 +1,170 @@
+// HYBRID INTEGRITY TRIGGERS - DIRECT VALIDATION
+// Run in: php artisan tinker
+
+echo "\n";
+echo "════════════════════════════════════════════════════════════════\n";
+echo "   HYBRID INTEGRITY TRIGGERS - VALIDATION\n";
+echo "════════════════════════════════════════════════════════════════\n\n";
+
+// TEST 1: Verify triggers exist
+echo "TEST 1: Verify Triggers Exist\n";
+echo "─────────────────────────────────────────────────────────────────\n";
+
+$triggers = DB::select("SHOW TRIGGERS FROM task_management_system");
+$triggerNames = array_map(fn($t) => $t->Trigger, $triggers);
+
+$expectedTriggers = [
+    'prevent_active_project_deletion',
+    'auto_complete_project_on_tasks_done',
+    'prevent_critical_overload',
+    'prevent_critical_overload_on_update',
+];
+
+foreach ($expectedTriggers as $name) {
+    if (in_array($name, $triggerNames)) {
+        echo "✓ $name\n";
+    } else {
+        echo "✗ $name - MISSING\n";
+    }
+}
+
+echo "\n";
+
+// TEST 2: Try to delete active project (should fail)
+echo "TEST 2: Try to Delete Active Project\n";
+echo "─────────────────────────────────────────────────────────────────\n";
+
+$activeProject = Project::where('status', 'active')->first();
+if ($activeProject) {
+    echo "Found active project: {$activeProject->id} - {$activeProject->name}\n";
+    try {
+        DB::delete("DELETE FROM projects WHERE id = ?", [$activeProject->id]);
+        echo "✗ FAIL: Project was deleted (trigger didn't work)\n";
+    } catch (\Illuminate\Database\QueryException $e) {
+        if (strpos($e->getMessage(), 'DATABASE INTEGRITY VIOLATION') !== false) {
+            echo "✓ PASS: Trigger blocked deletion with: DATABASE INTEGRITY VIOLATION\n";
+        } else {
+            echo "? Got error: " . substr($e->getMessage(), 0, 100) . "...\n";
+        }
+    }
+} else {
+    echo "No active projects to test\n";
+}
+
+echo "\n";
+
+// TEST 3: Test auto-complete trigger
+echo "TEST 3: Test Auto-Complete Trigger\n";
+echo "─────────────────────────────────────────────────────────────────\n";
+
+// Create test project
+$user = User::first();
+$testProj = Project::create([
+    'name' => 'AutoComplete Test ' . time(),
+    'description' => 'Testing auto-complete trigger',
+    'manager_id' => $user->id,
+    'status' => 'in_progress',
+    'priority' => 'low',
+]);
+
+echo "Created test project: {$testProj->id}\n";
+
+// Create 2 tasks
+$task1 = Task::create([
+    'project_id' => $testProj->id,
+    'title' => 'Task 1',
+    'description' => 'Test',
+    'created_by' => $user->id,
+    'assigned_user_id' => $user->id,
+    'status' => 'pending',
+    'priority' => 'low',
+]);
+
+$task2 = Task::create([
+    'project_id' => $testProj->id,
+    'title' => 'Task 2',
+    'description' => 'Test',
+    'created_by' => $user->id,
+    'assigned_user_id' => $user->id,
+    'status' => 'pending',
+    'priority' => 'low',
+]);
+
+echo "Created 2 test tasks\n";
+
+// Complete first task
+$task1->update(['status' => 'completed']);
+$testProj->refresh();
+echo "After completing Task 1: project status = {$testProj->status}\n";
+
+// Complete second task - should trigger auto-complete
+$task2->update(['status' => 'completed']);
+$testProj->refresh();
+echo "After completing Task 2: project status = {$testProj->status}\n";
+
+if ($testProj->status === 'completed') {
+    echo "✓ PASS: Auto-complete trigger worked\n";
+} else {
+    echo "✗ FAIL: Project not auto-completed\n";
+}
+
+// Cleanup
+$testProj->tasks()->delete();
+$testProj->delete();
+
+echo "\n";
+
+// TEST 4: Test critical overload
+echo "TEST 4: Test Critical Overload Prevention\n";
+echo "─────────────────────────────────────────────────────────────────\n";
+
+$testUser = User::first();
+$testProject = Project::first();
+
+// Count existing critical tasks
+$criticalCount = Task::where('assigned_user_id', $testUser->id)
+    ->where('priority', 'critical')
+    ->whereIn('status', ['pending', 'in_progress', 'on_hold'])
+    ->count();
+
+echo "User {$testUser->id} has $criticalCount critical active tasks\n";
+
+if ($criticalCount < 5) {
+    echo "Need at least 5 critical tasks to test. Creating " . (5 - $criticalCount) . " more...\n";
+    for ($i = 0; $i < (5 - $criticalCount); $i++) {
+        Task::create([
+            'project_id' => $testProject->id,
+            'title' => "Critical Test Task " . ($i + 1),
+            'description' => 'For testing',
+            'created_by' => $testUser->id,
+            'assigned_user_id' => $testUser->id,
+            'status' => 'pending',
+            'priority' => 'critical',
+        ]);
+    }
+    echo "Created test tasks\n";
+}
+
+echo "Attempting to create 6th critical task...\n";
+try {
+    Task::create([
+        'project_id' => $testProject->id,
+        'title' => "Should Fail",
+        'description' => 'This should fail',
+        'created_by' => $testUser->id,
+        'assigned_user_id' => $testUser->id,
+        'status' => 'pending',
+        'priority' => 'critical',
+    ]);
+    echo "✗ FAIL: 6th task was created (trigger didn't work)\n";
+} catch (\Illuminate\Database\QueryException $e) {
+    if (strpos($e->getMessage(), 'CAPACITY LIMIT EXCEEDED') !== false) {
+        echo "✓ PASS: Trigger blocked with: CAPACITY LIMIT EXCEEDED\n";
+    } else {
+        echo "? Got error: " . substr($e->getMessage(), 0, 100) . "...\n";
+    }
+}
+
+echo "\n════════════════════════════════════════════════════════════════\n";
+echo "VALIDATION COMPLETE\n";
+echo "════════════════════════════════════════════════════════════════\n\n";

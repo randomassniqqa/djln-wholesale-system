@@ -1,0 +1,11 @@
+.git
+.github
+.env
+.env.*
+node_modules
+vendor
+storage/logs
+storage/*.key
+tests
+bootstrap/cache
+*.md
