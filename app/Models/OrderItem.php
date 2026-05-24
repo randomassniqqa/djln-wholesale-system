@@ -12,6 +12,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class OrderItem extends Model
 {
+    protected $table = 'transaction_line_items';
+
     protected $fillable = [
         'order_id',
         'product_id',

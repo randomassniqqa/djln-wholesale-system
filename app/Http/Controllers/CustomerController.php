@@ -6,9 +6,13 @@ use App\Models\Category;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
+use App\Models\User;
+use App\Notifications\LowStockNotification;
+use App\Notifications\OrderStatusNotification;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\View\View;
 
 /**
@@ -107,7 +111,7 @@ class CustomerController extends Controller
     public function addToCart(Request $request): RedirectResponse
     {
         $request->validate([
-            'product_id' => ['required', 'exists:products,id'],
+            'product_id' => ['required', 'exists:inventory_items,id'],
             'quantity'   => ['required', 'integer', 'min:1', 'max:9999'],
         ]);
 
@@ -202,6 +206,24 @@ class CustomerController extends Controller
 
         // Clear cart after successful order
         session()->forget('djln_cart');
+
+        // ── Fire notifications ──────────────────────────────────────────
+        $order->load('customer', 'items.product');
+
+        // 1. Confirm to the customer
+        $order->customer->notify(new OrderStatusNotification($order, 'placed'));
+
+        // 2. Alert all admins + project managers
+        $staff = User::whereIn('role', ['admin', 'project_manager'])->get();
+        Notification::send($staff, new OrderStatusNotification($order, 'placed'));
+
+        // 3. Flag any products now at or below reorder level
+        foreach ($order->items as $item) {
+            $product = $item->product;
+            if ($product && $product->stock_qty <= $product->reorder_level) {
+                Notification::send($staff, new LowStockNotification($product));
+            }
+        }
 
         return redirect()
             ->route('customer.order-confirmation', $order)

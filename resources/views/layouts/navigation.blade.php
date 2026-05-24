@@ -59,6 +59,35 @@
             <span class="nav-label">Orders</span>
         </a>
 
+        {{-- ── Notifications ─────────────────────────────────────────── --}}
+        <div class="nav-section">Alerts</div>
+
+        <a href="{{ route('notifications.index') }}"
+           id="nav-notifications"
+           class="nav-item {{ request()->routeIs('notifications.*') ? 'active' : '' }}"
+           style="position:relative;">
+            {{-- Bell icon --}}
+            <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="flex-shrink:0;">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+            </svg>
+            <span class="nav-label" style="display:flex;align-items:center;gap:6px;">
+                Notifications
+                {{-- Unread badge — hidden when count = 0 --}}
+                <span id="notif-badge-sidebar"
+                      style="display:none;background:#dc2626;color:#fff;font-size:10px;font-weight:700;
+                             min-width:18px;height:18px;border-radius:99px;padding:0 5px;
+                             line-height:18px;text-align:center;">
+                    0
+                </span>
+            </span>
+            {{-- Collapsed-sidebar dot indicator --}}
+            <span id="notif-dot-sidebar"
+                  style="display:none;position:absolute;top:7px;right:7px;width:7px;height:7px;
+                         background:#dc2626;border-radius:50%;border:2px solid var(--sidebar);">
+            </span>
+        </a>
+
         @if(auth()->check() && auth()->user()->isAdmin())
         <div class="nav-section">Admin</div>
         <a href="{{ route('users.index') }}"
@@ -70,6 +99,7 @@
         </a>
         @endif
     </nav>
+
 
     {{-- User area --}}
     @if(auth()->check())

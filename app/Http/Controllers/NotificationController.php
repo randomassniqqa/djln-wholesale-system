@@ -2,16 +2,39 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\User;
+use App\Notifications\LowStockNotification;
+use App\Notifications\OrderStatusNotification;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Notifications\DatabaseNotification;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\View\View;
-use Illuminate\Support\Facades\Gate;
 
 class NotificationController extends Controller
 {
-    /**
-     * Get unread notifications count
-     */
+    // ──────────────────────────────────────────────
+    // INDEX — Full notifications page
+    // GET /notifications
+    // ──────────────────────────────────────────────
+
+    public function index(): View
+    {
+        $user          = auth()->user();
+        $notifications = $user->notifications()->latest()->paginate(20);
+        $unreadCount   = $user->unreadNotifications()->count();
+
+        // Mark all as read when viewing the page
+        $user->unreadNotifications()->update(['read_at' => now()]);
+
+        return view('notifications.index', compact('notifications', 'unreadCount'));
+    }
+
+    // ──────────────────────────────────────────────
+    // UNREAD COUNT — JSON for sidebar badge polling
+    // GET /notifications/unread-count
+    // ──────────────────────────────────────────────
+
     public function unreadCount(): JsonResponse
     {
         $count = auth()->user()->unreadNotifications()->count();
@@ -19,9 +42,11 @@ class NotificationController extends Controller
         return response()->json(['count' => $count]);
     }
 
-    /**
-     * Get recent notifications
-     */
+    // ──────────────────────────────────────────────
+    // RECENT — JSON for dropdown panel (top 10)
+    // GET /notifications/recent
+    // ──────────────────────────────────────────────
+
     public function recent(): JsonResponse
     {
         $notifications = auth()->user()
@@ -29,40 +54,39 @@ class NotificationController extends Controller
             ->latest()
             ->limit(10)
             ->get()
-            ->map(function ($notification) {
-                return [
-                    'id' => $notification->id,
-                    'data' => $notification->data,
-                    'read' => $notification->read_at !== null,
-                    'created_at' => $notification->created_at->diffForHumans(),
-                ];
-            });
+            ->map(fn ($n) => [
+                'id'         => $n->id,
+                'data'       => $n->data,
+                'read'       => $n->read_at !== null,
+                'created_at' => $n->created_at->diffForHumans(),
+            ]);
 
         return response()->json($notifications);
     }
 
-    /**
-     * Mark notification as read
-     * ✅ HARDENED: Added ownership verification before update
-     */
+    // ──────────────────────────────────────────────
+    // MARK AS READ — single notification
+    // PUT /notifications/{notification}/read
+    // ──────────────────────────────────────────────
+
     public function markAsRead(string $id): JsonResponse
     {
-        // ✅ CRITICAL FIX: Verify user owns this notification
         $notification = auth()->user()->notifications()->findOrFail($id);
-        
-        // Double-check authentication context
+
         if ($notification->notifiable_id !== auth()->id()) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
-        
+
         $notification->markAsRead();
 
         return response()->json(['success' => true]);
     }
 
-    /**
-     * Mark all notifications as read
-     */
+    // ──────────────────────────────────────────────
+    // MARK ALL READ
+    // PUT /notifications/mark-all-read
+    // ──────────────────────────────────────────────
+
     public function markAllAsRead(): JsonResponse
     {
         auth()->user()->unreadNotifications()->update(['read_at' => now()]);
@@ -70,22 +94,38 @@ class NotificationController extends Controller
         return response()->json(['success' => true]);
     }
 
-    /**
-     * Delete a notification
-     * ✅ HARDENED: Added ownership verification before delete
-     */
-    public function destroy(string $id): JsonResponse
+    // ──────────────────────────────────────────────
+    // DESTROY — delete one notification
+    // DELETE /notifications/{notification}
+    // ──────────────────────────────────────────────
+
+    public function destroy(string $id): JsonResponse|RedirectResponse
     {
-        // ✅ CRITICAL FIX: Verify user owns this notification
         $notification = auth()->user()->notifications()->findOrFail($id);
-        
-        // Double-check authentication context
+
         if ($notification->notifiable_id !== auth()->id()) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
-        
+
         $notification->delete();
 
-        return response()->json(['success' => true]);
+        // Support both AJAX and full-page requests
+        if (request()->expectsJson()) {
+            return response()->json(['success' => true]);
+        }
+
+        return back()->with('success', 'Notification dismissed.');
+    }
+
+    // ──────────────────────────────────────────────
+    // CLEAR ALL — wipe all of the user's notifications
+    // DELETE /notifications
+    // ──────────────────────────────────────────────
+
+    public function destroyAll(): RedirectResponse
+    {
+        auth()->user()->notifications()->delete();
+
+        return back()->with('success', 'All notifications cleared.');
     }
 }

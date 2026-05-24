@@ -330,6 +330,33 @@ function djlnToast(msg, type = 'success') {
 @endif
 </script>
 
+// ── Notification badge polling ──────────────────────────────
+@auth
+(function pollNotifBadge() {
+    const badge = document.getElementById('notif-badge-sidebar');
+    const dot   = document.getElementById('notif-dot-sidebar');
+    if (!badge || !dot) return;
+
+    function refresh() {
+        fetch('{{ route("notifications.unread-count") }}', {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        })
+        .then(r => r.json())
+        .then(data => {
+            const count = data.count || 0;
+            badge.textContent = count > 99 ? '99+' : count;
+            badge.style.display = count > 0 ? 'inline-block' : 'none';
+            dot.style.display   = count > 0 ? 'block' : 'none';
+        })
+        .catch(() => {});
+    }
+
+    refresh();
+    setInterval(refresh, 60000);
+})();
+@endauth
+</script>
+
 @stack('scripts')
 </body>
 </html>

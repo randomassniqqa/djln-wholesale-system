@@ -479,6 +479,23 @@
                 @endif
             </a>
 
+            {{-- Notification Bell --}}
+            <a href="{{ route('notifications.index') }}"
+               id="shop-notif-btn"
+               style="position:relative;display:flex;align-items:center;justify-content:center;
+                      width:38px;height:38px;border-radius:10px;border:1.5px solid #e2e8f0;
+                      background:#fff;color:#475569;text-decoration:none;transition:all 0.15s;"
+               onmouseover="this.style.borderColor='#0ea5e9';this.style.color='#0ea5e9';this.style.background='#f0f9ff';"
+               onmouseout="this.style.borderColor='#e2e8f0';this.style.color='#475569';this.style.background='#fff';">
+                <svg style="width:18px;height:18px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+                </svg>
+                <span id="shop-notif-dot"
+                      style="display:none;position:absolute;top:4px;right:4px;width:8px;height:8px;
+                             background:#dc2626;border-radius:50%;border:2px solid #fff;"></span>
+            </a>
+
             <div class="nav-user">
                 <div class="nav-user-avatar">
                     {{ strtoupper(substr(auth()->user()->name, 0, 1)) }}
@@ -524,5 +541,27 @@
 </div>
 
 @stack('scripts')
+
+<script>
+// Shop notification bell dot polling
+@auth
+(function() {
+    const dot = document.getElementById('shop-notif-dot');
+    if (!dot) return;
+    function refresh() {
+        fetch('{{ route("notifications.unread-count") }}', {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        })
+        .then(r => r.json())
+        .then(data => {
+            dot.style.display = (data.count > 0) ? 'block' : 'none';
+        })
+        .catch(() => {});
+    }
+    refresh();
+    setInterval(refresh, 60000);
+})();
+@endauth
+</script>
 </body>
 </html>

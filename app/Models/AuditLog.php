@@ -10,6 +10,8 @@ class AuditLog extends Model
 {
     use HasFactory;
 
+    protected $table = 'system_audit_trail';
+
     protected $fillable = [
         'user_id',
         'action',

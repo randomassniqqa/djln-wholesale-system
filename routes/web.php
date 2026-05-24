@@ -57,6 +57,19 @@ Route::middleware(['auth'])->group(function () {
     });
 
     // ══════════════════════════════════════════════════════════════════════
+    // NOTIFICATIONS — accessible to ALL roles (staff & clients)
+    // ══════════════════════════════════════════════════════════════════════
+    Route::prefix('notifications')->name('notifications.')->group(function () {
+        Route::get('/',                [NotificationController::class, 'index'])->name('index');
+        Route::get('/unread-count',   [NotificationController::class, 'unreadCount'])->name('unread-count');
+        Route::get('/recent',         [NotificationController::class, 'recent'])->name('recent');
+        Route::put('/mark-all-read',  [NotificationController::class, 'markAllAsRead'])->name('mark-all-read');
+        Route::delete('/clear-all',   [NotificationController::class, 'destroyAll'])->name('clear-all');
+        Route::put('/{id}/read',      [NotificationController::class, 'markAsRead'])->name('mark-as-read');
+        Route::delete('/{id}',        [NotificationController::class, 'destroy'])->name('destroy');
+    });
+
+    // ══════════════════════════════════════════════════════════════════════
     // ADMIN / STAFF AREA — customerGuard blocks role=client from all below
     // ══════════════════════════════════════════════════════════════════════
     Route::middleware('customerGuard')->group(function () {
@@ -126,14 +139,8 @@ Route::middleware(['auth'])->group(function () {
             Route::get('/audit-logs', [UserController::class, 'auditLogs'])->name('audit-logs');
         });
 
-        // ── Notifications ─────────────────────────────────────────────────
-        Route::prefix('notifications')->name('notifications.')->group(function () {
-            Route::get('/unread-count',        [NotificationController::class, 'unreadCount'])->name('unread-count');
-            Route::get('/recent',              [NotificationController::class, 'recent'])->name('recent');
-            Route::put('/{notification}/read', [NotificationController::class, 'markAsRead'])->name('mark-as-read');
-            Route::put('/mark-all-read',       [NotificationController::class, 'markAllAsRead'])->name('mark-all-read');
-            Route::delete('/{notification}',   [NotificationController::class, 'destroy'])->name('destroy');
-        });
+        // ── Notifications (staff-only API variants, kept for admin panel) ─────
+        // Full notification routes are accessible to all roles above.
 
         // ── Profile ───────────────────────────────────────────────────────
         Route::get('/profile/preferences',    [PageController::class, 'preferences'])->name('profile.preferences');

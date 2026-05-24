@@ -5,9 +5,13 @@ namespace App\Http\Controllers;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
+use App\Models\User;
+use App\Notifications\LowStockNotification;
+use App\Notifications\OrderStatusNotification;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\View\View;
 
 /**
@@ -109,7 +113,7 @@ class OrderController extends Controller
 
             // Line items array
             'items'              => ['required', 'array', 'min:1'],
-            'items.*.product_id' => ['required', 'exists:products,id'],
+            'items.*.product_id' => ['required', 'exists:inventory_items,id'],
             'items.*.quantity'   => ['required', 'integer', 'min:1'],
         ]);
 
@@ -175,9 +179,31 @@ class OrderController extends Controller
             return $order;
         });
 
+        // Fire notifications outside the transaction (non-critical)
+        $this->fireOrderPlacedNotifications($order->load('customer', 'items.product'));
+
         return redirect()
             ->route('orders.show', $order)
             ->with('success', "Order {$order->order_number} created. Total: ₱" . number_format($order->total_amount, 2));
+    }
+
+    // ── Fire notifications after transaction ──────────────────────────
+    private function fireOrderPlacedNotifications(Order $order): void
+    {
+        // 1. Notify the customer
+        $order->customer->notify(new OrderStatusNotification($order, 'placed'));
+
+        // 2. Notify all admins + project managers
+        $staff = User::whereIn('role', ['admin', 'project_manager'])->get();
+        Notification::send($staff, new OrderStatusNotification($order, 'placed'));
+
+        // 3. Check if any ordered products are now low/out-of-stock
+        foreach ($order->items as $item) {
+            $product = $item->product;
+            if ($product->stock_qty <= $product->reorder_level) {
+                Notification::send($staff, new LowStockNotification($product));
+            }
+        }
     }
 
     // ──────────────────────────────────────────────
@@ -230,10 +256,23 @@ class OrderController extends Controller
                 $order->update($validated);
             });
 
+            // Notify customer their order was cancelled
+            $order->customer->notify(
+                new OrderStatusNotification($order, 'cancelled', auth()->user()->name)
+            );
+
             return back()->with('success', "Order {$order->order_number} cancelled. Stock has been restored.");
         }
 
         $order->update($validated);
+
+        // Notify the customer of the status change (non-cancellation)
+        if (isset($validated['fulfillment_status'])) {
+            $order->load('customer');
+            $order->customer->notify(
+                new OrderStatusNotification($order, $validated['fulfillment_status'], auth()->user()->name)
+            );
+        }
 
         $statusLabel = collect($validated)->map(fn ($v) => strtoupper(str_replace('_', ' ', $v)))->implode(' / ');
 

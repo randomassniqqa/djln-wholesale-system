@@ -49,7 +49,7 @@ class InventoryDashboardController extends Controller
                 ->sum('total_amount');
 
             // ── 2. ORDER METRICS ──────────────────────────────────────
-            $orderCounts = DB::table('orders')
+            $orderCounts = DB::table('wholesale_transactions')
                 ->selectRaw("
                     COUNT(*) as total,
                     SUM(CASE WHEN fulfillment_status = 'pending'    THEN 1 ELSE 0 END) as pending,
@@ -63,7 +63,7 @@ class InventoryDashboardController extends Controller
                 ->first();
 
             // ── 3. STOCK / PRODUCT METRICS ────────────────────────────
-            $stockStats = DB::table('products')
+            $stockStats = DB::table('inventory_items')
                 ->where('is_active', true)
                 ->selectRaw("
                     COUNT(*) as total_products,
@@ -120,19 +120,19 @@ class InventoryDashboardController extends Controller
                        'total_amount', 'ordered_at']);
 
             // ── 6. TOP SELLING PRODUCTS (this month) ──────────────────
-            $topProducts = DB::table('order_items')
-                ->join('orders', 'orders.id', '=', 'order_items.order_id')
-                ->join('products', 'products.id', '=', 'order_items.product_id')
-                ->whereMonth('orders.ordered_at', now()->month)
-                ->whereYear('orders.ordered_at', now()->year)
+            $topProducts = DB::table('transaction_line_items')
+                ->join('wholesale_transactions', 'wholesale_transactions.id', '=', 'transaction_line_items.order_id')
+                ->join('inventory_items', 'inventory_items.id', '=', 'transaction_line_items.product_id')
+                ->whereMonth('wholesale_transactions.ordered_at', now()->month)
+                ->whereYear('wholesale_transactions.ordered_at', now()->year)
                 ->selectRaw('
-                    products.id,
-                    products.name,
-                    products.sku,
-                    SUM(order_items.quantity)   as total_qty_sold,
-                    SUM(order_items.line_total) as total_revenue
+                    inventory_items.id,
+                    inventory_items.name,
+                    inventory_items.sku,
+                    SUM(transaction_line_items.quantity)   as total_qty_sold,
+                    SUM(transaction_line_items.line_total) as total_revenue
                 ')
-                ->groupBy('products.id', 'products.name', 'products.sku')
+                ->groupBy('inventory_items.id', 'inventory_items.name', 'inventory_items.sku')
                 ->orderByDesc('total_revenue')
                 ->limit(5)
                 ->get();

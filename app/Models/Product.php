@@ -32,6 +32,8 @@ class Product extends Model
 {
     use HasFactory;
 
+    protected $table = 'inventory_items';
+
     protected $fillable = [
         'category_id',
         'name',

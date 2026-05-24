@@ -74,7 +74,7 @@ class ProductController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
-            'category_id'     => ['required', 'exists:categories,id'],
+            'category_id'     => ['required', 'exists:product_categories,id'],
             'name'            => ['required', 'string', 'max:150'],
             'description'     => ['nullable', 'string', 'max:1000'],
             'brand_name'      => ['nullable', 'string', 'max:100'],
@@ -160,9 +160,9 @@ class ProductController extends Controller
     public function update(Request $request, Product $product): RedirectResponse
     {
         $validated = $request->validate([
-            'category_id'     => ['required', 'exists:categories,id'],
+            'category_id'     => ['required', 'exists:product_categories,id'],
             'name'            => ['required', 'string', 'max:150'],
-            'sku'             => ['required', 'string', 'max:50', 'unique:products,sku,' . $product->id],
+            'sku'             => ['required', 'string', 'max:50', 'unique:inventory_items,sku,' . $product->id],
             'description'     => ['nullable', 'string', 'max:1000'],
             'brand_name'      => ['nullable', 'string', 'max:100'],
             'weight_volume'   => ['nullable', 'string', 'max:50'],

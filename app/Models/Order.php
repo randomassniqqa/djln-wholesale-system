@@ -15,6 +15,8 @@ use Illuminate\Database\Eloquent\Builder;
  */
 class Order extends Model
 {
+    protected $table = 'wholesale_transactions';
+
     protected $fillable = [
         'order_number',
         'customer_id',

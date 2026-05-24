@@ -54,7 +54,7 @@ class CategoryController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
-            'name'        => ['required', 'string', 'max:100', 'unique:categories,name'],
+            'name'        => ['required', 'string', 'max:100', 'unique:product_categories,name'],
             'description' => ['nullable', 'string', 'max:500'],
             'icon'        => ['nullable', 'string', 'max:10'],
             'is_active'   => ['boolean'],
@@ -109,7 +109,7 @@ class CategoryController extends Controller
     public function update(Request $request, Category $category): RedirectResponse
     {
         $validated = $request->validate([
-            'name'        => ['required', 'string', 'max:100', 'unique:categories,name,' . $category->id],
+            'name'        => ['required', 'string', 'max:100', 'unique:product_categories,name,' . $category->id],
             'description' => ['nullable', 'string', 'max:500'],
             'icon'        => ['nullable', 'string', 'max:10'],
             'is_active'   => ['boolean'],
